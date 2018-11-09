@@ -1,0 +1,129 @@
+---
+title: "Price of Cities"
+author: "Alex Kaechele"
+date: "May 30, 2018"
+output:
+  html_document:
+    number_sections: false
+    toc: true
+    theme: cosmo
+    highlight: tango
+    code_folding : hide
+---
+
+### Loading the Data
+
+```{r setup, warning = FALSE, message = FALSE}
+
+# Load Packages
+library(data.table)
+
+# Read Data
+quality <- fread("C:/Users/AK055125/Downloads/movehubqualityoflife.csv")
+cost <- fread("C:/Users/AK055125/Downloads/movehubcostofliving.csv")
+location <- fread("C:/Users/AK055125/Downloads/simplemaps-worldcities-basic.csv")
+```
+
+### Filtering Data to WICA (What I Care About)
+
+```{r fitering, warning = FALSE, message = FALSE}
+
+# Loading Packages
+library(dplyr)
+
+# WICA List
+wica <- c("San Francisco", "New York", "Washington", "Boston", "Seattle", "San Diego", "Chicago", "Paris", "Munich", "London", "Brussels", "Frankfurt", "Berlin", "Amsterdam", "Florence", "Rome", "Madrid", "Milan", "Barcelona", "Saint Louis", "Los Angeles")
+
+# Standardizing Names in Location Data
+location[city == "Washington, D.C."] <- "Washington"
+location[city == "St. Louis"] <- "Saint Louis"
+
+# Filtering Data
+quality <- quality[quality$City %in% wica,]
+cost <- cost[cost$City %in% wica,]
+location <- location[location$city %in% wica,]
+```
+
+
+### Cleaning Data 
+
+* Converting GBP -> USD
+* Removing Duplicates (Cross Country) in Location
+* Ordering Datasets
+
+```{r cleaning, warning = FALSE, message = FALSE}
+
+# 1 GBP = 1.33 USD
+# Changing Cost Units
+cost[,2:7] <- cost[,2:7]*1.33
+
+## Removing Duplicates (Only Want Original City)
+# Creating city-country code
+location$citycountry <- paste(location$city, location$country, sep = ", ")
+
+# Making a list of cities to remove
+remove <- c("San Francisco, Argentina", "London, Canada", "Los Angeles, Chile", "Florence, United States of America", "London, United States of America", "Barcelona, Venezuela")
+
+# Removing Data
+location <- location[!(citycountry %in% remove),]
+  
+# Ordering Datasets
+location <- location[order(city),]
+cost <- cost[order(City),]
+quality <- quality[order(City),]
+```
+
+### Making Tables
+
+```{r tables, warning = FALSE, message = FALSE}
+
+# Loading Packages
+library(kableExtra)
+library(knitr)
+library(DT)
+
+# Creating tables
+as.data.table(cost) %>% kable("html", align = "c") %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+
+as.data.table(quality) %>% kable("html", align = "c") %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+
+
+
+DT::datatable(cbind(cost$City, round(as.numeric(cost$`Avg Rent`)/1304.2645, digits = 2)),
+              colnames = c("City", "Relative Rent"),
+              rownames = NULL,
+              class = 'cell-border stripe',
+              options = list(lengthMenu = c(10, 25, 50), 
+                             pageLength = 25,
+                             autoWidth = TRUE,
+                             columnDefs = list(list(width = '10px', targets = "_all"))
+                             ))
+
+  
+  
+```
+
+
+```{r geographicdistribution, warning = FALSE, message = FALSE, fig.height = 7, fig.width = 10}
+# Load Packages
+library(leaflet)
+location$avgrent <- cost$`Avg Rent`
+
+leafletloc <- location[!is.na(lat),]
+
+# Make Plot of Cities
+leaflet(leafletloc) %>%
+  addTiles() %>%
+  addCircles(lng = ~lng, 
+             lat = ~lat, 
+             weight = 1,
+             radius = ~avgrent*50,
+             popup = paste(leafletloc$city, "<br/>", "Rent (USD):", round(leafletloc$avgrent)),
+             color = ifelse(leafletloc$avgrent/1304.2645 > rep(1, length(leafletloc$avgrent)), "red", "blue"))
+
+
+```
+
+<br><br>

@@ -1,0 +1,135 @@
+---
+title: "Taxi Driving Predictions"
+author: "Alex Kaechele"
+date: "August 5, 2018"
+output:
+  html_document:
+    number_sections: false
+    toc: true
+    theme: cosmo
+    highlight: tango
+    code_folding : hide
+---
+
+<link rel="stylesheet" type="text/css" href="http://cdn.datatables.net/1.10.5/css/jquery.dataTables.min.css">
+<script src="http://code.jquery.com/jquery-2.1.2.min.js"></script>
+<script src="http://cdn.datatables.net/1.10.5/js/jquery.dataTables.min.js"></script>
+
+<script type="text/javascript">
+         $(document).ready(function() {
+             $(".dtable").DataTable();
+         } );
+</script>
+
+
+```{r taximage, warning = FALSE, message = FALSE}
+
+knitr::include_graphics("https://thewallpaper.co/wp-content/uploads/2016/10/New-york-city-street-taxi-hd-wallpaper-desktop-wallpapers-hd-4k-high-definition-windows-10-mac.apple-colourful-images-free-2560x1600-768x480.jpg")
+
+```
+
+
+
+# 1. Overview
+
+
+A bit about taxis and what I've found out about with other kernals.
+
+
+<br>
+
+# 2. Data Formating
+
+## 2.1 Setup
+
+This is the step where data is imported and needed packages are loaded. A brief description of the function of each package is also included.
+
+```{r DataSetup, echo = TRUE, warning = FALSE, message = FALSE}
+
+# Loading Packages for Data Cleaning Sections
+library(sqldf) # allows for preselection of values
+library(data.table) # quick data manipulation / data reading
+library(dplyr) # handy for data manipulation
+library(plotly) # nice data viz package for interactive visualizations
+library(ggplot2) # another nice data viz package
+library(Amelia) # good way to explore data missingness
+library(leaflet) # great mapping tool
+# Loading Data
+taxitrain <- as.data.table(read.csv.sql("C:/Users/AK055125/Documents/taxi_train.csv", 
+                                        sql = "select * from file where `fare_amount` > 0 and passenger_count > 0 and passenger_count < 7", eol = "\n"))
+taxitest <- as.data.table(fread("C:/Users/AK055125/Downloads/test.csv"))
+taxitrain_small <- head(taxitrain, 10000) # more computationally friendly dataset to prototype some models
+
+tr <- as.data.table(read.csv("C:/Users/AK055125/Documents/taxi_train.csv", header=TRUE, colClasses = c("key" = "character", "fare_amount" = "numeric", "pickup_datetime" = "POSIXct", "dropoff_longitude" = "numeric", "pickup_longitude" = "numeric", "dropoff_latitude" = "numeric", "pickup_latitude" = "numeric", "passenger_count" = "integer"), nrows = 22000000) %>% select(-key))
+
+# might need to do this
+
+
+```
+
+
+## 2.2 Data Cleaning
+
+Here missing/inconsistent data is dealt with. An example of inconsistent data is having negative ages or a person having a title "Miss" but marked as male. In addition, if there are columns that are the wrong data type (e.g. numeric data stored as a character), that would be dealt with here. 
+
+Fortunately for us, the only data cleaning needed is handling the missing data in the age column. Since we are trying to predict external data that may have missing age data we will need to create a rule for imputation (since age is rather important in determining probability of surviving the Titanic). Fortunately there is some correlation between the titles and ages: "Master" is a term for a male child, those with "Miss" in their title have a lower average age than "Mrs," and those with "Officer" titles tend to be the oldest age group. Thus, we can impute missing ages by average ages of the different titles and get a better approximation for the missing ages than we would otherwise.
+
+
+```{r DataCleaning, echo = TRUE, warning = FALSE, message = FALSE}
+
+## Evaluating problems we'll have to deal with in the test data
+missmap(taxitest) # Excellent no missingness problems
+
+# Checking passenger count values
+ggplot(taxitest, aes(x=passenger_count)) + 
+  geom_density(color="darkblue", fill="lightblue") # Awsome maxes out at 6 which is reasonable
+
+# Checking if there are values outside nyc
+leaflet() %>%
+  addTiles() %>%
+  addMarkers(lng = taxitest$pickup_longitude, lat = taxitest$pickup_latitude) # dropoff shows similar values but leaflet starts to crash with that many observations
+
+
+## Treating training data problems 
+# Removing trips with no passengers
+
+# Removing trips with more than 6 passengers
+
+# Removing missing values
+
+# Removing negative fares
+
+
+```
+
+
+## 2.3 Feature Engineering
+
+Here we create additional variables that will be useful in our model. Some features I created include:
+
+- Title dummies
+- Family size
+- Gender
+- Embarked location.
+
+```{r FeatureEngineering, echo = TRUE, warning = FALSE, message = FALSE}
+
+```
+
+## 2.4 Readying Data for Model Selection
+
+Here we make a data frame of our numeric data, create a design matrix and specify our response. This formatting will be needed in our model selection process.
+
+```{r ModelSelectionPrep, echo = TRUE, warning = FALSE, message = FALSE}
+
+# Subsetting Data to Numeric Features
+list <- c("Survived", "Age", "Fare", "mr", "miss", "mrs", "master", "officer", "FamilySize", "Class1", "Class2", "Class3", "female", "Southampton", "Queenstown", "Cherbourg")
+newdat <- subset(dat, select = list)
+
+# Creating Target Variable and Design Matrix
+x = model.matrix(Survived ~ ., data = newdat)
+y = dat$Survived
+
+```
+
+

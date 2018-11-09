@@ -1,0 +1,87 @@
+---
+title: "Application Thoughts"
+author: "Alex Kaechele"
+date: "January 3rd, 2017"
+output: html_document
+---
+
+###List of Schools
+
+<br>
+
+* MIT
+* University of Chicago
+* Harvard
+* Princeton
+* Yale
+* Columbia
+* Brown
+* Washington University
+* Stanford
+* Northwestern
+* Johns Hopkins
+* UPenn
+* Cornell
+* University of Wisconsin
+* Berkeley
+* NYU
+* Boston University
+* University of Virginia
+* University of Minnisota
+* University of Washington
+* UC Davis
+* UC Santa Barbara
+* USC
+* Duke
+* Michigan State
+* University of Maryland
+* UC San Diego
+* University of Michigan
+* LMU
+* Oxford
+* Cambridge
+* Freiburg
+* London School of Economics
+
+<br><br>
+
+###Schools in leaflet
+
+<br><br>
+
+```{r setup, message=FALSE, warning=FALSE, echo=FALSE}
+library(htmltools)
+library(leaflet)
+
+names <- c("MIT", "University of Chicago", "Harvard", "Princeton", "Yale",
+           "Columbia", "Brown", "Washington University", "Stanford", "Northwestern",
+           "Johns Hopkins", "UPenn", "Cornell", "University of Wisconsin", "Berkeley",
+           "NYU", "Boston University", "University of Virginia", "University of Minnisota", "University of Washington",
+           "UC Davis", "UC Santa Barbara", "USC", "Duke", "Michigan State",
+           "University of Maryland", "UC San Diego", "University of Michigan", "LMU", "Oxford",
+           "Cambridge", "Freiburg", "London School of Economics")
+long <- c(-71.0942, -87.5987, -71.1167, -74.6672, -72.9223,
+          -73.9626, -71.4025, -90.3108, -122.1697, -87.675171,
+          -76.6205, -75.1932, -76.4735, -89.4125, -122.2585, 
+          -73.9965, -71.1054, -78.5080, -93.2277, -122.3035,
+          -121.7617, -119.8489, -118.2851, -78.9382, -84.4822,
+          -76.9426, -117.2340,  -83.7382, 11.5804, -1.2544,
+          0.1149, 7.8459, -0.1174)
+lat <- c(42.3601, 41.7886, 42.3770, 40.3573, 41.3163,
+         40.8075, 41.8268, 38.6488, 37.4275, 42.055984,
+         39.3299, 39.9522, 42.4534, 43.0766, 37.8719, 
+         40.7295, 42.3505, 38.0336, 44.9740, 47.6553,
+         38.5382, 34.4140, 34.0224, 36.0014, 42.7018,
+         38.9869, 32.8801, 42.2780, 48.1508, 51.7548,
+         52.2043, 47.9935, 51.5144)
+
+maps <- leaflet() %>%
+  addTiles() %>%  # Add default OpenStreetMap map tiles
+  addMarkers(lng=long, lat=lat, popup= names)
+
+
+tagList(maps)
+
+```
+
+<br><br>

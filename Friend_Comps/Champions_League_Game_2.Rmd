@@ -1,0 +1,195 @@
+---
+title: "Jerry vs Kaechele"
+author: "Alex Kaechele"
+date: "November 7, 2018"
+output:
+  html_document:
+    number_sections: false
+    toc: true
+    theme: cosmo
+    highlight: tango
+    code_folding : hide
+---
+
+<br>
+
+```{r cl image, echo = FALSE, warning = FALSE, message = FALSE}
+knitr::include_graphics("https://img.uefa.com/imgml/uefacom/ucl/social/og-default.jpg")
+```
+
+<br>
+
+# Overview
+
+**The Players**
+
+Jerry and myself (Alex Kaechele)
+
+**The Game**
+
+Players take turns selecting Champions League Teams. The goal is to pick the winning team
+
+**Drafting Process**
+
+Drafting: The first person selects a team. The second player chooses two teams (to mitigate the first player advantage), and then the two players alternate picks until all 32 teams are chosen.
+
+<br>
+
+# The Picks
+
+I picked first followed by Jerry. These were our selected teams (I gifted the last 4 to Jerry because of their near 0 chance of winning the tournament):
+
+```{r team selection, message=FALSE, warning=FALSE}
+# Loading in Selected Teams
+require(data.table)
+library(knitr)
+library(kableExtra)
+  
+data.table(`Jerry's Teams` = c("Barcelona", "Juventus", "PSG", "Dortmund", "Atletico Madrid", "Inter Milan", "Lyon", "Porto", "Valencia", "Galatasaray", "Benfica", "Young Boys", "Monaco", "Viktoria Plzen", "Lokomotiv", "Red Star", "AEK Athens", "Club Brugge"),
+           `Kaechele's Teams` = c("Man City", "Bayern Munich", "Liverpool", "Real Madrid", "Napoli", "Roma", "Ajax", "Schalke_04", "CSKA Moscow", "Man United", "Hoffenheim", "Shakhtar", "PSV", "Tottenham", "", "", "", "")) %>% 
+  kable() %>%
+  kable_styling("striped", full_width = F) %>%
+  #column_spec(1, bold=T) %>%
+  row_spec(0, bold = T, color = "white", background = "#5e78d6") 
+
+
+
+```
+
+<br>
+
+# Who's Winning?
+
+**Prediction Data**
+
+To get a sense of who was winning. I web-scraped data from [FiveThirtyEight](https://projects.fivethirtyeight.com/soccer-predictions/champions-league/) to get probabilities of each team making it to the final round. Adding up the chances of winning it all gives each player an expected score.
+
+<br>
+
+**Championship Expected Scores**
+
+Here is each team's odds of winning it all:
+
+```{r expected scores, warning=FALSE, message=FALSE}
+# Loading Packages
+library(rvest)
+library(qdapRegex)
+library(gsubfn)
+library(ggplot2)
+
+# URL for fivethirtyeight data
+url <- 'https://projects.fivethirtyeight.com/soccer-predictions/champions-league/'
+
+#session <- html_session(url)
+#form <- html_form(read_html(url))[[1]]
+#filled_form <- set_values(form, searchby = 'Your username here', keys = 'Your password here')
+
+# Loading the HTML code from website
+webpage <- read_html(url)
+
+# Getting probabilities of reaching certain rounds
+predictions <- NULL
+for (i in 1:32){
+  predictions <- rbind(predictions, (html_nodes(webpage,'.champ') %>% html_attr("data-val"))[(1+i*8):(8+i*8)])
+}
+
+# Making the table a data frame
+predictions <- as.data.frame(predictions)
+
+# Making everything numeric
+predictions = as.data.frame(sapply(predictions, function(x) as.numeric(as.character(x))))
+
+# Getting rows (with team names)
+rownames(predictions) <- html_nodes(webpage, ".team-row .champ-win , .team-row .drop-3 , .team-row .drop-7 , .team-row .drop-4 , .team-row .champ-group3 , .team-row .champ-group2 , .border-left , .team-row .team") %>% 
+  html_attr("data-str") %>%
+  na.omit() %>%
+  as.character() %>%
+  gsub(pattern = " ", replacement = "_") %>%
+  gsub(pattern = ".", replacement = "", fixed = TRUE)
+
+
+
+
+
+# naming columns (with predicted round)
+names(predictions) <- html_nodes(webpage,'.lower .champ') %>%
+  rm_between("\">", '</', extract=TRUE) %>%
+  unlist() %>%
+  gsub(pattern = " ", replacement = "_") %>%
+  gsub(pattern = "1st", replacement = "first") %>%
+  gsub(pattern = "2nd", replacement = "second") %>%
+  gsub(pattern = "3rd", replacement = "third")
+
+# Loading in Selected Teams
+kaechele_teams <- c("man_city", "bayern_munich", "liverpool", "real_madrid", "napoli", "roma", "ajax", "schalke_04", "cska_moscow", "man_united", "hoffenheim", "shakhtar", "psv", "tottenham")
+  
+jerry_teams <- c("barcelona", "juventus", "psg", "dortmund", "atletico_madrid", "inter_milan", "lyon",  "porto", "valencia", "galatasaray", "benfica", "young_boys", "monaco", "viktoria_plzen", "lokomotiv", "red_star", "aek_athens", "club_brugge" )
+  
+ 
+
+data.table("Round" = c("Championship"),
+           "Jerry" = sum(predictions[row.names(predictions) %in% jerry_teams,]$win_final),
+           "Kaechele" = sum(predictions[row.names(predictions) %in% kaechele_teams,]$win_final)) %>% 
+  kable() %>%
+  kable_styling("striped", full_width = F) %>%
+  column_spec(1, bold=T) %>%
+  row_spec(0, bold = T, color = "white", background = "#5e78d6") 
+
+```
+
+<br>
+
+**What Teams are Paying Off?**
+
+Here is how each team is expected to contribute to the group stage score:
+
+```{r team scores, warning=FALSE, message=FALSE}
+# Jerry top performers
+jerry_team_scores <- cbind(team = rownames(predictions)[rownames(predictions) %in% jerry_teams], 
+                           score = predictions[row.names(predictions) %in% jerry_teams,]$win_final) %>%
+                           data.table() 
+# Kaechele top performers
+kaechele_team_scores <- cbind(team = rownames(predictions)[rownames(predictions) %in% kaechele_teams],
+                          score = predictions[row.names(predictions) %in% kaechele_teams,]$win_final) %>%
+                           data.table() 
+
+
+cbind(jerry_team_scores[order(as.numeric(score), decreasing = TRUE)] %>% 
+        dplyr::rename(., "Jerry's Team" = "team"), 
+      kaechele_team_scores[order(as.numeric(score), decreasing = TRUE)] %>% 
+      rbind(. , data.frame( team = c("", "", "", ""),
+       score = c("", "", "", "" ))) %>%
+      dplyr::rename(., "Kaechele's Team" = "team"))  %>% 
+  kable() %>%
+  kable_styling("striped", full_width = F) %>%
+  column_spec(1, bold=T) %>%
+  column_spec(3, bold=T) %>%
+  row_spec(0, bold = T, color = "white", background = "#5e78d6")
+
+
+ 
+```
+
+<br>
+
+**Distribution of Team Expected Score**
+
+Here are the Group Stage expected score distributions:
+
+```{r team score distribution, warning=FALSE, message=FALSE}
+options(scipen=999)
+
+dat <- data.frame(cbind(person = append(rep("Jerry", 18), rep("Kaechele", 14)),
+             score = append(jerry_team_scores$score, kaechele_team_scores$score)), stringsAsFactors = FALSE)
+dat$score <- as.numeric(dat$score)
+dat$person <- as.factor(dat$person)
+
+wdat <- dat %>% dplyr::group_by(person) %>% dplyr::summarize(avscore = mean(score))
+
+
+ggplot(dat, aes(x = score)) + geom_density(aes(fill = person), alpha = 0.4) +
+  geom_vline(data = wdat, aes(xintercept = avscore, color = person), linetype = "dashed") +
+  ylab('Density') + xlab('Expected Score') + ggtitle("CL Team Expected Score Distribution") + 
+  theme_classic()
+```
+

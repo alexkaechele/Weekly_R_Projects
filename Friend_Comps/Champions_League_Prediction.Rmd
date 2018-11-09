@@ -1,0 +1,195 @@
+---
+title: "Champions League Draft"
+author: "Alex Kaechele"
+date: "October 6, 2018"
+output:
+  html_document:
+    number_sections: false
+    toc: true
+    theme: cosmo
+    highlight: tango
+    code_folding : hide
+---
+
+<br>
+
+```{r cl image, echo = FALSE, warning = FALSE, message = FALSE}
+knitr::include_graphics("https://img.uefa.com/imgml/uefacom/ucl/social/og-default.jpg")
+```
+
+<br>
+
+# Overview
+
+**The Players**
+
+Nikki and myself (Alex Kaechele)
+
+**The Game**
+
+Players take turns selecting Champions League Teams. These teams will earn points throughout the game. The goal is to win the most rounds (Group Stage, Round of 16, Quarterfinals, Semifinals, and Championship)
+
+**Drafting Process**
+
+Drafting: The first person selects a team. The second player chooses two teams (to mitigate the first player advantage), and then the two players alternate picks until all 32 teams are chosen.
+
+**Point System**
+
+Group Stage: Players win two points for each team getting first in their group. Players get one point for every team getting second in their group. No points are awarded for getting third or fourth in the group.
+
+Elimination Rounds: Players get 1 point for every team that wins a game in each stage.
+  
+<br>
+
+# The Picks
+
+Nikki chose first followed by me. These were our selected teams:
+
+```{r team selection, message=FALSE, warning=FALSE}
+# Loading in Selected Teams
+require(data.table)
+library(knitr)
+library(kableExtra)
+  
+data.table(`Nikki's Teams` = c("Bayern Munich", "Barcelona", "Tottenham", "Napoli", "Ajax", "Porto", "Man United", "PSV", "CSKA Moscow", "Young Boys", "Galatasaray", "Club Brugge", "Hoffenheim", "Monaco", "AEK Athens", "Viktoria Plzen"), 
+           `Alex's Teams` = c("Man City", "Real Madrid", "Liverpool", "Juventus", "Atletico Madrid", "PSG", "Dortmund","Inter Milan", "Roma", "Lyon", "Valencia", "Benfica", "Shakhtar", "Schalke_04", "Red Star","Lokomotiv")) %>% 
+  kable() %>%
+  kable_styling("striped", full_width = F) %>%
+  #column_spec(1, bold=T) %>%
+  row_spec(0, bold = T, color = "white", background = "#5e78d6") 
+
+
+
+```
+
+<br>
+
+# Who's Winning?
+
+**Prediction Data**
+
+To get a sense of who was winning. I web-scraped data from [FiveThirtyEight](https://projects.fivethirtyeight.com/soccer-predictions/champions-league/) to get probabilities of each team making it to a given round. Multiplying those probabilities times the number of points each position was worth gave me a round by round expected score.
+
+<br>
+
+**Group Stage Expected Scores**
+
+Here is how the Group Stage is expected to finish:
+
+```{r expected scores, warning=FALSE, message=FALSE}
+# Loading Packages
+library(rvest)
+library(qdapRegex)
+library(gsubfn)
+library(ggplot2)
+
+# URL for fivethirtyeight data
+url <- 'https://projects.fivethirtyeight.com/soccer-predictions/champions-league/'
+
+#session <- html_session(url)
+#form <- html_form(read_html(url))[[1]]
+#filled_form <- set_values(form, searchby = 'Your username here', keys = 'Your password here')
+
+# Loading the HTML code from website
+webpage <- read_html(url)
+
+# Getting probabilities of reaching certain rounds
+predictions <- NULL
+for (i in 1:32){
+  predictions <- rbind(predictions, (html_nodes(webpage,'.champ') %>% html_attr("data-val"))[(1+i*8):(8+i*8)])
+}
+
+# Making the table a data frame
+predictions <- as.data.frame(predictions)
+
+# Making everything numeric
+predictions = as.data.frame(sapply(predictions, function(x) as.numeric(as.character(x))))
+
+# Getting rows (with team names)
+rownames(predictions) <- html_nodes(webpage, ".team-row .champ-win , .team-row .drop-3 , .team-row .drop-7 , .team-row .drop-4 , .team-row .champ-group3 , .team-row .champ-group2 , .border-left , .team-row .team") %>% 
+  html_attr("data-str") %>%
+  na.omit() %>%
+  as.character() %>%
+  gsub(pattern = " ", replacement = "_") %>%
+  gsub(pattern = ".", replacement = "", fixed = TRUE)
+
+
+
+
+
+# naming columns (with predicted round)
+names(predictions) <- html_nodes(webpage,'.lower .champ') %>%
+  rm_between("\">", '</', extract=TRUE) %>%
+  unlist() %>%
+  gsub(pattern = " ", replacement = "_") %>%
+  gsub(pattern = "1st", replacement = "first") %>%
+  gsub(pattern = "2nd", replacement = "second") %>%
+  gsub(pattern = "3rd", replacement = "third")
+
+# Loading in Selected Teams
+alex_teams <- c("man_city", "real_madrid", "liverpool", "juventus", "atletico_madrid", "psg", "dortmund","inter_milan", 
+                "roma", "lyon", "valencia", "benfica", "shakhtar", "schalke_04", "red_star","lokomotiv")
+nikki_teams <- c("bayern_munich", "barcelona", "tottenham", "napoli", "ajax", "porto", "man_united", "psv", "cska_moscow", 
+                 "young_boys", "galatasaray", "club_brugge", "hoffenheim", "monaco", "aek_athens", "viktoria_plzen")
+
+# nikki group stage score
+data.table("Round" = c("Group Stage"),
+           "Nikki" = sum(predictions[row.names(predictions) %in% nikki_teams,]$first*2 + predictions[row.names(predictions) %in% nikki_teams,]$second),
+           "Alex" = sum(predictions[row.names(predictions) %in% alex_teams,]$first*2 + predictions[row.names(predictions) %in% alex_teams,]$second)) %>% 
+  kable() %>%
+  kable_styling("striped", full_width = F) %>%
+  column_spec(1, bold=T) %>%
+  row_spec(0, bold = T, color = "white", background = "#5e78d6") 
+
+```
+
+<br>
+
+**What Teams are Paying Off?**
+
+Here is how each team is expected to contribute to the group stage score:
+
+```{r team scores, warning=FALSE, message=FALSE}
+# nikki top performers
+nikki_team_scores <- cbind(team = rownames(predictions)[rownames(predictions) %in% nikki_teams], 
+                           score = predictions[row.names(predictions) %in% nikki_teams,]$first*2 + predictions[row.names(predictions) %in% nikki_teams,]$second) %>%
+                           data.table() 
+# alex top performers
+alex_team_scores <- cbind(team = rownames(predictions)[rownames(predictions) %in% alex_teams],
+                          score = predictions[row.names(predictions) %in% alex_teams,]$first*2 + predictions[row.names(predictions) %in% alex_teams,]$second) %>%
+                           data.table() 
+
+
+cbind(nikki_team_scores[order(as.numeric(score), decreasing = TRUE)] %>% dplyr::rename(., "Nikki's Team" = "team"), 
+      alex_team_scores[order(as.numeric(score), decreasing = TRUE)] %>% dplyr::rename(., "Alex's Team" = "team"))  %>% 
+  kable() %>%
+  kable_styling("striped", full_width = F) %>%
+  column_spec(1, bold=T) %>%
+  column_spec(3, bold=T) %>%
+  row_spec(0, bold = T, color = "white", background = "#5e78d6")
+
+
+ 
+```
+
+<br>
+
+**Distribution of Team Expected Score**
+
+Here are the Group Stage expected score distributions:
+
+```{r team score distribution, warning=FALSE, message=FALSE}
+dat <- data.frame(cbind(person = append(rep("Nikki", 16), rep("Alex", 16)),
+             score = append(nikki_team_scores$score, alex_team_scores$score)), stringsAsFactors = FALSE)
+dat$score <- as.numeric(dat$score)
+dat$person <- as.factor(dat$person)
+
+wdat <- dat %>% dplyr::group_by(person) %>% dplyr::summarize(avscore = mean(score))
+
+
+ggplot(dat, aes(x = score)) + geom_density(aes(fill = person), alpha = 0.4) +
+  geom_vline(data = wdat, aes(xintercept = avscore, color = person), linetype = "dashed") +
+  ylab('Density') + xlab('Expected Score') + ggtitle("CL Team Expected Score Distribution") + 
+  theme_classic()
+```
+

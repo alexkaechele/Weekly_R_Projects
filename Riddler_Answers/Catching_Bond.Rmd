@@ -1,0 +1,514 @@
+---
+title: 'The Riddler: Catching James Bond'
+author: "Alex Kaechele"
+date: "October 27, 2018"
+output:
+  html_document:
+    number_sections: false
+    toc: true
+    theme: cosmo
+    highlight: tango
+    code_folding : hide
+---
+
+```{r}
+knitr::include_graphics("https://c1.staticflickr.com/3/2940/14582969029_a4ca9475a7_b.jpg")
+```
+
+
+***
+
+<br>
+
+# The Problem
+
+<br>
+
+This problem comes from [FiveThirtyEight's](https://fivethirtyeight.com/features/who-will-capture-the-most-james-bonds/) **The Riddler**. Copied from the original posting is the situation:
+
+<br>
+
+>"You are a super villain whose two roommates also happen to be super villains.
+>
+>A problem: James Bond has discovered your whereabouts and is coming to get you. Good thing all three of you are great at designing spy-capturing nets. Time to fortify your defenses.
+>
+You and all your roommates will place one net each, but you're villains, so you each want to design the trap that actually nabs Bond. One major thing to keep in mind: Villains' nets, as everyone knows, are always placed in threes, and in increasing order of effectiveness. So if your lair is equipped with nets that capture an invader 10, 20 and 50 percent of the time, for example, James Bond has to try to get past them in that order. Unless, of course, he gets captured first. So you each need to design not the most effective net, but the net you think is most likely to grab Bond before someone else's. (You don't know what traps your roommates are designing before all three are deployed.)
+>
+Keep that in mind as you design and name your new net. Specifically, calibrate the percentage chance that it will capture James Bond if he tries to pass by it. Remember, your goal is for your trap to ensnare James Bond. Ninety-nine percent effectiveness sounds like a great trap, but it is also likely to come at the end of the three traps, and Bond may have already been captured before he gets to it."
+
+<br>
+
+***
+
+# Framing the Question
+
+<br>
+
+**Players**
+
+There are 3 players, you and your two roommates.
+
+* $P_{1}$ (You)
+* $P_{2}$ (Roommate 1)
+* $P_{3}$ (Roommate 2)
+
+<br>
+
+**Actions**
+
+Each player chooses to build a net with a probability between 0 and 1 inclusive of catching Bond.
+
+$P_{i}$ where $i \in [1,3]$ can choose net of probability $x_{i} \in [0,1]$
+
+<br>
+
+**Payoffs**
+
+This is the payoff function for player one but can be applied symmetrically to the other players.
+
+$$
+\mu(x_{1}, x_{2}, x_{3}) = \left\{
+        \begin{array}{ll}
+            x_{1} < x_{2} \quad \& \quad x_{1} < x_{3} , \quad \quad x_{1} \\
+            x_{1} > x_{2} \quad \& \quad x_{1} < x_{3} , \quad \quad x_{1}(1-x_{2}) \\
+            x_{1} < x_{2} \quad \& \quad x_{1} > x_{3} , \quad \quad x_{1}(1-x_{3}) \\
+            x_{1} > x_{2} \quad \& \quad x_{1} > x_{3} , \quad \quad x_{1}(1-x_{2})(1-x_{3})
+        \end{array}
+    \right.
+$$
+
+<br>
+
+**Best Responses**
+
+<span style="color:red">
+This portion is still under development but eventually I will set up a game theory solution to this problem. Until then, this section can be useful for framing the problem.
+</span>
+
+<br>
+
+
+***
+
+# The BruteForce  &trade;  Approach
+
+<br>
+
+**The Idea**
+
+An initial solution, BruteForce  &trade; assumes that people randomly decide how good to build their nets. This assumption is likely invalid, but gives us a starting point before a Nash Equalibrium is found.
+
+<br>
+
+**Data Generation**
+
+Here I generate 10 million rows of random data of values between 0 and 1 for three players. The first 10 rows of the data are shown below.
+
+```{r making data, warning=FALSE, message=FALSE}
+
+# Loading Packages
+library(dplyr)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+
+# Setting seed for reproducability
+set.seed(007)
+
+# test dataset (simulating 10 million random picks)
+test <- data.table::data.table(x = runif(10000000), y =  runif(10000000), z = runif(10000000))
+
+head(test, 10) %>%
+  kable() %>%
+  kable_styling("striped", full_width = FALSE) %>%
+  row_spec(0, bold = T, color = "white", background = "#5e78d6")
+
+```
+
+
+<br>
+
+**Applying the Payoffs**
+
+I calculate the payoffs (probabilities of catching Bond) for player x for each row conditional on the choices for the other two players' actions.
+
+```{r, making payoffs, warning=FALSE, message=FALSE}
+# Score assignment based off of description
+test[ x < y & x < z, xscore := x]
+test[ x < y & x > z, xscore := x*(1 - z)]
+test[ x > y & x < z, xscore := x*(1 - y)]
+test[ x > y & x > z, xscore := x*(1 - y)*(1 - z)]
+
+head(test, 10) %>%
+  kable() %>%
+  kable_styling("striped", full_width = FALSE) %>%
+  row_spec(0, bold = T, color = "white", background = "#5e78d6")
+```
+
+<br>
+
+**Picking a Probability**
+
+Since these probabilites are continuous and we want enough data per each choice to know that ideal choice (the one with the highest chance of catching Bond) aren't just due to random chance, I bin the probabilities to the nearest tenth of a percentage point.
+
+For each binned BruteForce &trade; probability, I then find the median score. The binned probability with the highest score is the specification I build my net to. Based on this, if people choose their picks randomly my net should be the one to catch bond about 40% of the time with a net that catches Bond **56.4%** of time. The top 10 choices are displayed below.
+
+```{r, choice, warning=FALSE, message=FALSE}
+# Making choices discrete (to whole percentage point)
+test[, x_cut := substr(as.character(x) , 1 , 5)]
+
+# Creating average score by choice
+test[,av_score := median(xscore), by = as.factor(x_cut)]
+
+# Checking out the average scores by the binned scores
+new <- test[!duplicated(x_cut)] %>%
+  select(x_cut, av_score) %>%
+  .[order(as.numeric(x_cut))]
+  
+new %>%
+  .[order(as.numeric(av_score), decreasing = TRUE)] %>%
+  head(. , 10) %>%
+  kable() %>%
+  kable_styling("striped", full_width = FALSE) %>%
+  row_spec(0, bold = T, color = "white", background = "#5e78d6")
+
+
+```
+
+
+<br>
+
+**Checking the Distribution**
+
+The distribution seems to confirm that the optimal choice when your opponants are choosing randomly is somewhere around 55%.
+
+```{r, distribution, warning=FALSE, message=FALSE}
+
+ggplot() + 
+  geom_area(aes(y = av_score, x = as.numeric(x_cut), fill = "blue"), data = new, stat="identity") + 
+  geom_vline(xintercept = .564) +
+  coord_cartesian(xlim=c(0,1)) +
+  xlab("Net Probabilities") +
+  ylab("Chance of Catching Bond") +
+  ggtitle("Choosing the Best Net", subtitle = "BruteForce is Shown in Black") +
+  scale_fill_manual(values = "#85C1E9")
+  
+
+```
+
+
+<br>
+
+
+# The AggraCounter  &trade;  Approach
+
+<br>
+
+**The Idea**
+
+An initial solution, AggraCounter  &trade; assumes that people tend to build nets with high chances of getting bond to build their nets.
+
+<br>
+
+**Data Generation**
+
+Here I generate 10 million rows of data of values between 0 and 1 for three players. The first 10 rows of the data are shown below.
+
+```{r making data0, warning=FALSE, message=FALSE}
+
+# Setting seed for reproducability
+set.seed(007)
+
+# test dataset (simulating 10 million random picks)
+test <- data.table::data.table(x = runif(10000000), 
+                               y = truncnorm::rtruncnorm(n=10000000, a=0, b=1, mean= .7, sd = .15), 
+                               z = truncnorm::rtruncnorm(n=10000000, a=0, b=1, mean= .7, sd = .15))
+
+head(test, 10) %>%
+  kable() %>%
+  kable_styling("striped", full_width = FALSE) %>%
+  row_spec(0, bold = T, color = "white", background = "#5e78d6")
+
+```
+
+
+<br>
+
+**Applying the Payoffs**
+
+I calculate the payoffs (probabilities of catching Bond) for player x for each row conditional on the choices for the other two players' actions.
+
+```{r, making payoffs0, warning=FALSE, message=FALSE}
+# Score assignment based off of description
+test[ x < y & x < z, xscore := x]
+test[ x < y & x > z, xscore := x*(1 - z)]
+test[ x > y & x < z, xscore := x*(1 - y)]
+test[ x > y & x > z, xscore := x*(1 - y)*(1 - z)]
+
+head(test, 10) %>%
+  kable() %>%
+  kable_styling("striped", full_width = FALSE) %>%
+  row_spec(0, bold = T, color = "white", background = "#5e78d6")
+```
+
+<br>
+
+**Picking a Probability**
+
+Since these probabilites are continuous and we want enough data per each choice to know that ideal choice (the one with the highest chance of catching Bond) aren't just due to random chance, I bin the probabilities to the nearest tenth of a percentage point.
+
+For each binned AggraCounter &trade; probability, I then find the median score. The binned probability with the highest score is the specification I build my net to. Based on this, if people choose their picks randomly my net should be the one to catch bond about 61% of the time with a net that catches Bond **61.6%** of time. The top 10 choices are displayed below.
+
+```{r, choice0, warning=FALSE, message=FALSE}
+# Making choices discrete (to whole percentage point)
+test[, x_cut := substr(as.character(x) , 1 , 5)]
+
+# Creating average score by choice
+test[,av_score := median(xscore), by = as.factor(x_cut)]
+
+# Checking out the average scores by the binned scores
+new <- test[!duplicated(x_cut)] %>%
+  select(x_cut, av_score) %>%
+  .[order(as.numeric(x_cut))]
+  
+new %>%
+  .[order(as.numeric(av_score), decreasing = TRUE)] %>%
+  head(. , 10) %>%
+  kable() %>%
+  kable_styling("striped", full_width = FALSE) %>%
+  row_spec(0, bold = T, color = "white", background = "#5e78d6")
+
+
+```
+
+
+<br>
+
+**Checking the Distribution**
+
+The distribution seems to confirm that the optimal choice when your opponants are choosing randomly is very sharp at the 61% mark.
+
+```{r, distribution0, warning=FALSE, message=FALSE}
+
+ggplot() + 
+  geom_area(aes(y = av_score, x = as.numeric(x_cut), fill = "blue"), data = new, stat="identity") + 
+  geom_vline(xintercept = 0.616) +
+  coord_cartesian(xlim=c(0,1)) +
+  xlab("Net Probabilities") +
+  ylab("Chance of Catching Bond") +
+  ggtitle("Choosing the Best Net", subtitle = "AggraCounter is Shown in Black") +
+  scale_fill_manual(values = "#85C1E9")
+  
+
+```
+
+
+
+<br>
+
+
+# The SmallCounter  &trade;  Approach
+
+<br>
+
+**The Idea**
+
+An initial solution, SmallCounter  &trade; assumes that people decide to build their nets around the 30% mark. Aka that people tend to build bad nets.
+
+<br>
+
+**Data Generation**
+
+Here I generate 10 million rows of data of values between 0 and 1 for three players. The first 10 rows of the data are shown below.
+
+```{r making data1, warning=FALSE, message=FALSE}
+
+# Setting seed for reproducability
+set.seed(007)
+
+# test dataset (simulating 10 million random picks)
+test <- data.table::data.table(x = runif(10000000), 
+                               y = truncnorm::rtruncnorm(n=10000000, a=0, b=1, mean= .3, sd = .15), 
+                               z = truncnorm::rtruncnorm(n=10000000, a=0, b=1, mean= .3, sd = .15))
+
+head(test, 10) %>%
+  kable() %>%
+  kable_styling("striped", full_width = FALSE) %>%
+  row_spec(0, bold = T, color = "white", background = "#5e78d6")
+
+```
+
+
+<br>
+
+**Applying the Payoffs**
+
+I calculate the payoffs (probabilities of catching Bond) for player x for each row conditional on the choices for the other two players' actions.
+
+```{r, making payoffs1, warning=FALSE, message=FALSE}
+# Score assignment based off of description
+test[ x < y & x < z, xscore := x]
+test[ x < y & x > z, xscore := x*(1 - z)]
+test[ x > y & x < z, xscore := x*(1 - y)]
+test[ x > y & x > z, xscore := x*(1 - y)*(1 - z)]
+
+head(test, 10) %>%
+  kable() %>%
+  kable_styling("striped", full_width = FALSE) %>%
+  row_spec(0, bold = T, color = "white", background = "#5e78d6")
+```
+
+<br>
+
+**Picking a Probability**
+
+Since these probabilites are continuous and we want enough data per each choice to know that ideal choice (the one with the highest chance of catching Bond) aren't just due to random chance, I bin the probabilities to the nearest tenth of a percentage point.
+
+For each binned SmallCounter &trade; probability, I then find the median score. The binned probability with the highest score is the specification I build my net to. Based on this, if people choose their picks randomly my net should be the one to catch bond about 47% of the time with a net that catches Bond **99.7%** of time. The top 10 choices are displayed below.
+
+```{r, choice1, warning=FALSE, message=FALSE}
+# Making choices discrete (to whole percentage point)
+test[, x_cut := substr(as.character(x) , 1 , 5)]
+
+# Creating average score by choice
+test[,av_score := median(xscore), by = as.factor(x_cut)]
+
+# Checking out the average scores by the binned scores
+new <- test[!duplicated(x_cut)] %>%
+  select(x_cut, av_score) %>%
+  .[order(as.numeric(x_cut))]
+  
+new %>%
+  .[order(as.numeric(av_score), decreasing = TRUE)] %>%
+  head(. , 10) %>%
+  kable() %>%
+  kable_styling("striped", full_width = FALSE) %>%
+  row_spec(0, bold = T, color = "white", background = "#5e78d6")
+
+
+```
+
+
+<br>
+
+**Checking the Distribution**
+
+The distribution seems to confirm that the optimal choice when your opponants are building a bad net is to build a good net.
+
+```{r, distribution1, warning=FALSE, message=FALSE}
+
+ggplot() + 
+  geom_area(aes(y = av_score, x = as.numeric(x_cut), fill = "blue"), data = new, stat="identity") + 
+  geom_vline(xintercept = 0.997) +
+  coord_cartesian(xlim=c(0,1)) +
+  xlab("Net Probabilities") +
+  ylab("Chance of Catching Bond") +
+  ggtitle("Choosing the Best Net", subtitle = "SmallCounter is Shown in Black") +
+  scale_fill_manual(values = "#85C1E9")
+  
+
+```
+
+
+# The MixedBag  &trade;  Approach
+
+<br>
+
+**The Idea**
+
+An initial solution, MixedBag  &trade; assumes that one of your opponants builds a good net and the other builds a bad net.
+
+<br>
+
+**Data Generation**
+
+Here I generate 10 million rows of data of values between 0 and 1 for three players. The first 10 rows of the data are shown below.
+
+```{r making data2, warning=FALSE, message=FALSE}
+
+# Setting seed for reproducability
+set.seed(007)
+
+# test dataset (simulating 10 million random picks)
+test <- data.table::data.table(x = runif(10000000), 
+                               y = truncnorm::rtruncnorm(n=10000000, a=0, b=1, mean= .7, sd = .15), 
+                               z = truncnorm::rtruncnorm(n=10000000, a=0, b=1, mean= .3, sd = .15))
+
+head(test, 10) %>%
+  kable() %>%
+  kable_styling("striped", full_width = FALSE) %>%
+  row_spec(0, bold = T, color = "white", background = "#5e78d6")
+
+```
+
+
+<br>
+
+**Applying the Payoffs**
+
+I calculate the payoffs (probabilities of catching Bond) for player x for each row conditional on the choices for the other two players' actions.
+
+```{r, making payoffs2, warning=FALSE, message=FALSE}
+# Score assignment based off of description
+test[ x < y & x < z, xscore := x]
+test[ x < y & x > z, xscore := x*(1 - z)]
+test[ x > y & x < z, xscore := x*(1 - y)]
+test[ x > y & x > z, xscore := x*(1 - y)*(1 - z)]
+
+head(test, 10) %>%
+  kable() %>%
+  kable_styling("striped", full_width = FALSE) %>%
+  row_spec(0, bold = T, color = "white", background = "#5e78d6")
+```
+
+<br>
+
+**Picking a Probability**
+
+Since these probabilites are continuous and we want enough data per each choice to know that ideal choice (the one with the highest chance of catching Bond) aren't just due to random chance, I bin the probabilities to the nearest tenth of a percentage point.
+
+For each binned MixedBag &trade; probability, I then find the median score. The binned probability with the highest score is the specification I build my net to. Based on this, if people choose their picks randomly my net should be the one to catch bond about 39% of the time with a net that catches Bond **62** of time. The top 10 choices are displayed below.
+
+```{r, choice2, warning=FALSE, message=FALSE}
+# Making choices discrete (to whole percentage point)
+test[, x_cut := substr(as.character(x) , 1 , 5)]
+
+# Creating average score by choice
+test[,av_score := median(xscore), by = as.factor(x_cut)]
+
+# Checking out the average scores by the binned scores
+new <- test[!duplicated(x_cut)] %>%
+  select(x_cut, av_score) %>%
+  .[order(as.numeric(x_cut))]
+  
+new %>%
+  .[order(as.numeric(av_score), decreasing = TRUE)] %>%
+  head(. , 10) %>%
+  kable() %>%
+  kable_styling("striped", full_width = FALSE) %>%
+  row_spec(0, bold = T, color = "white", background = "#5e78d6")
+
+
+```
+
+
+<br>
+
+**Checking the Distribution**
+
+The distribution seems to confirm that the optimal choice when one of your opponants is building a bad net and the other is building a good net is somewhere around low 60% points.
+
+```{r, distribution2, warning=FALSE, message=FALSE}
+
+ggplot() + 
+  geom_area(aes(y = av_score, x = as.numeric(x_cut), fill = "blue"), data = new, stat="identity") + 
+  geom_vline(xintercept = 0.620) +
+  coord_cartesian(xlim=c(0,1)) +
+  xlab("Net Probabilities") +
+  ylab("Chance of Catching Bond") +
+  ggtitle("Choosing the Best Net", subtitle = "MixedBag is Shown in Black") +
+  scale_fill_manual(values = "#85C1E9")
+  
+
+```
+

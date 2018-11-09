@@ -1,0 +1,44 @@
+---
+title: "Goblins, Ghouls, and Ghosts"
+author: "Alex Kaechele"
+date: "October 8, 2018"
+output:
+  html_document:
+    number_sections: false
+    toc: true
+    theme: readable
+    highlight: tango
+    code_folding : hide
+---
+
+```{r halloween, message=FALSE, echo = FALSE, warning=FALSE, fig.width=50, fig.height=10}
+knitr::include_graphics("http://www.dgtully.in/wp-content/uploads/2016/10/halloween_2014_by_unidcolor-d84gnev.jpg")
+
+```
+
+<br>
+
+# The Data
+
+The data comes from [kaggle](https://www.kaggle.com/c/ghouls-goblins-and-ghosts-boo)
+
+<br>
+
+# The Problem
+
+```{r loading data, message=FALSE, warning=FALSE}
+
+# Loading Packages
+require(data.table)
+
+# Loading the Data
+
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+dat <- fread("Halloween_Classification_Train.csv")
+
+fastDummies::dummy_cols(dat, "color")
+
+
+
+```
+
