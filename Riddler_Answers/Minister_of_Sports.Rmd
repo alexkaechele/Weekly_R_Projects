@@ -1,0 +1,97 @@
+---
+title: "Ministry of Sport"
+author: "Alex Kaechele"
+date: "November 9, 2018"
+output:
+  html_document:
+    number_sections: false
+    toc: true
+    theme: cosmo
+    highlight: tango
+    code_folding : hide
+---
+
+# Overview
+
+**Rules/Assumptions**
+
+- 16 teams play each other once (round robin format)
+- Each team has a unique strength 16-1
+- Schedule is random
+- Season ends when one team is mathematically the winner
+- Games are determined probabilistically 
+    + Chance of winning numerator is the team's strength
+    + Chance of losing numerator is the opposing team's strength
+    + Chance of drawing is 1
+    + The denominator for each is the sum of the two teams' strengths + 1
+- A win is worth 2 pts, a draw 1 point, and a loss 0 pt
+
+**Goal**
+
+Create the fewest (median) games played.
+
+**Actions**
+
+After the first round (which all teams play simultaneously), we can pick the order of games played.
+
+<br>
+
+# Setting up the Data
+
+
+Since we don't care who wins, just how many games it takes, let's create teams A-P with strengths in decending order (A with strength 16 and P with strength 1)
+
+```{r , message = FALSE, warning = FALSE}
+
+for (j in 1:10){
+
+# Making Initial Randomness Reproducable
+set.seed(j)
+
+# Loading Packages
+library(dplyr)
+library(data.table)
+
+# Setting Number of Teams and Number of Rounds
+n <- 16
+teams <- LETTERS[1:n]
+strengths <- n:1
+r <- 15
+
+# Setting up Possible Pairings and Team Strength
+rounds <- list()
+for(i in 1:r){
+  round <- 
+    data.table(
+      round = i,
+      team1 = teams[1:(n/2)],
+      team2 = rev(teams)[1:(n/2)]#,
+     # team1_strength = strengths[1:(n/2)],
+     # team2_strength = rev(strengths)[1:(n/2)]
+     )
+      rounds[[i]] <- round
+      teams <- c(teams[1], last(teams), head(teams[-1], -1))
+}
+rr <- bind_rows(rounds)
+
+# Randomizing Order of Rounds
+key <- data.table(round = 1:16,
+                  real_round = sample(1:16, size = 16, replace = FALSE))
+rr <- merge(rr, key, by = "round")
+rr[ , round := NULL]
+
+# Adding Winning Chances
+# rr[ , team_1_expt_pts := 2*team1_strength/(1 + team1_strength + team2_strength) + 1/(1 + team1_strength + team2_strength) ]
+# rr[ , team_2_expt_pts := 2*team2_strength/(1 + team1_strength + team2_strength) + 1/(1 + team1_strength + team2_strength) ]
+
+# Probability of winning (and drawing)
+rr[ , team1_win_prob := team1_strength/(1 + team1_strength + team2_strength)]
+rr[ , team2_win_prob := team2_strength/(1 + team1_strength + team2_strength)]
+rr[ , drawing := 1/(1 + team1_strength + team2_strength)]
+
+print(rr)
+
+}
+
+```
+
