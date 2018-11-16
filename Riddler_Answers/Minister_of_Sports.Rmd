@@ -43,55 +43,129 @@ Since we don't care who wins, just how many games it takes, let's create teams A
 
 ```{r , message = FALSE, warning = FALSE}
 
-for (j in 1:10){
+#for (j in 1:10){
 
 # Making Initial Randomness Reproducable
-set.seed(j)
+#set.seed(j)
 
 # Loading Packages
 library(dplyr)
 library(data.table)
 
-# Setting Number of Teams and Number of Rounds
+# Setting teams, rounds, and strengths
 n <- 16
 teams <- LETTERS[1:n]
 strengths <- n:1
 r <- 15
+strength_dat <- data.table(teams, strengths)
 
-# Setting up Possible Pairings and Team Strength
+# Setting up Possible Pairings
 rounds <- list()
 for(i in 1:r){
   round <- 
     data.table(
       round = i,
       team1 = teams[1:(n/2)],
-      team2 = rev(teams)[1:(n/2)]#,
-     # team1_strength = strengths[1:(n/2)],
-     # team2_strength = rev(strengths)[1:(n/2)]
+      team2 = rev(teams)[1:(n/2)]
      )
       rounds[[i]] <- round
       teams <- c(teams[1], last(teams), head(teams[-1], -1))
 }
 rr <- bind_rows(rounds)
 
+# Merging Strengths to Dataset
+rr <- merge(rr, strength_dat,
+      by.x = "team1",
+      by.y = "teams",
+      all.x = TRUE) %>% setnames(. , "strengths", "team1_strength")
+rr <- merge(rr, strength_dat,
+      by.x = "team2",
+      by.y = "teams",
+      all.x = TRUE) %>% setnames(. , "strengths", "team2_strength")
+
 # Randomizing Order of Rounds
-key <- data.table(round = 1:16,
-                  real_round = sample(1:16, size = 16, replace = FALSE))
+key <- data.table(round = 1:15,
+                  real_round = sample(1:15, size = 15, replace = FALSE))
 rr <- merge(rr, key, by = "round")
 rr[ , round := NULL]
-
-# Adding Winning Chances
-# rr[ , team_1_expt_pts := 2*team1_strength/(1 + team1_strength + team2_strength) + 1/(1 + team1_strength + team2_strength) ]
-# rr[ , team_2_expt_pts := 2*team2_strength/(1 + team1_strength + team2_strength) + 1/(1 + team1_strength + team2_strength) ]
 
 # Probability of winning (and drawing)
 rr[ , team1_win_prob := team1_strength/(1 + team1_strength + team2_strength)]
 rr[ , team2_win_prob := team2_strength/(1 + team1_strength + team2_strength)]
 rr[ , drawing := 1/(1 + team1_strength + team2_strength)]
 
-print(rr)
+# Simulate Winning and Losing
+team1_points <- NULL
+team2_points <- NULL
+for(row_id in 1:nrow(rr)){
+  team1_points <- append(team1_points,  
+                         sample(x = c(2, 1, 0), 
+                                1, 
+                                replace = FALSE, 
+                                prob = c(rr$team1_win_prob[row_id], 
+                                         rr$draw[row_id], 
+                                         rr$team2_win_prob[row_id])))
+  team2_points <- 2 - team1_points
+}
+rr <- cbind(rr, team1_points, team2_points)
 
+# Point Calculations
+new <- data.table(NULL)
+for(teamname in LETTERS[1:16]){
+  
+  # calculating round points
+  dt <- rbind(rr[ team1 == teamname, .(team1, real_round ,team1_points)] %>% 
+                setnames(. , c("team1", "team1_points", "real_round"), c("team", "pts", "rd")),
+              rr[ team2 == teamname, .(team2, real_round, team2_points)] %>% 
+                setnames(. , c("team2", "team2_points", "real_round"), c("team", "pts", "rd")))[order(rd)]
+  
+  # Calculate total points
+  dt <- dt[, .(team, rd+1, pts, cumsum(pts))] %>% setnames(. , c("V2", "V4"), c( "round", "totalpts"))
+  
+  # calculating max points
+  dt[ , max_pts := 30 - 2*as.numeric(row.names(dt)) + totalpts]
+  
+  new <- rbind(new, dt)
 }
 
+new[ , pts := NULL]
+
+rr <- merge(rr, new,
+             by.x = c("real_round", "team1"),
+             by.y = c("round", "team"),
+             all.x = TRUE) %>% setnames(. , c("totalpts", "max_pts"), c("team1_totalpts", "team1_max_pts"))
+
+rr <- merge(rr, new,
+             by.x = c("real_round", "team2"),
+             by.y = c("round", "team"),
+             all.x = TRUE) %>% setnames(. , c("totalpts", "max_pts"), c("team2_totalpts", "team2_max_pts"))
+
+rr[is.na(team1_max_pts), team1_max_pts := 30]
+rr[is.na(team2_max_pts), team2_max_pts := 30]
+rr[is.na(team1_totalpts), team1_totalpts := 0]
+rr[is.na(team2_totalpts), team2_totalpts := 0]
+
+# Calculate odds of ending season 
+  # function of total points
+  # opposing teams max points
+  # expected points of the given round
+
+
+
+# sort by round and season ending odds
+#rr[order(real_round, season_end_prob)]
+
+# Evaluate performance
+# Identify game that ended season
+# Total games 
+# Number of wasted games
+
+#print(rr)
+
+#}
+
 ```
+
+
+
 
