@@ -1,0 +1,36 @@
+---
+title: "Beer Pong and Chess"
+author: "Alex Kaechele"
+date: "November 22, 2018"
+output:
+  html_document:
+    number_sections: false
+    toc: true
+    theme: cosmo
+    highlight: tango
+    code_folding : hide
+---
+
+# Chess World Championships
+
+## What are Odds?
+
+```{r, message = FALSE, warning = FALSE}
+
+score <- NULL
+for(match in 1:1000000){
+set.seed(match)
+pts <- sample(x = c(1 , .5, 0), replace = TRUE, prob = c(.2, .65, .15), size = 12)
+score <- append(score, sum(pts) >6)
+}
+
+mean(score) # Chances of the better player winning (0.519)
+
+```
+
+## Making the Best Win
+
+
+# Beer Pong Reimagined
+
+## How Many Games
