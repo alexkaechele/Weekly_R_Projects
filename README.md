@@ -39,6 +39,6 @@ These are some data projects that I've done in my free time. Feel free to check 
 | ------------- | ------------- | ------------- |
 | Borgen Project  | Political Affairs Analyst | 2014  |
 | University of Kansas  | Research Assistant | 2015-2017  |
-| Cerner Corporation  | Data Analyst | 2017-2018  |
+| Cerner Corporation  | Data Analyst | 2017-Current  |
 
 
