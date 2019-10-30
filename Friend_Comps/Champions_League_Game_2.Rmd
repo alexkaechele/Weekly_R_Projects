@@ -90,7 +90,8 @@ webpage <- read_html(url)
 # Getting probabilities of reaching certain rounds
 predictions <- NULL
 for (i in 1:32){
-  predictions <- rbind(predictions, (html_nodes(webpage,'.champ') %>% html_attr("data-val"))[(1+i*8):(8+i*8)])
+  predictions <- rbind(predictions, (html_nodes(webpage,'.champ') %>% html_attr("data-val"))[(1+i*5):(5+i*5)]
+                       )
 }
 
 # Making the table a data frame
@@ -128,8 +129,8 @@ jerry_teams <- c("barcelona", "juventus", "psg", "dortmund", "atletico_madrid", 
  
 
 data.table("Round" = c("Championship"),
-           "Jerry" = sum(predictions[row.names(predictions) %in% jerry_teams,]$win_final),
-           "Kaechele" = sum(predictions[row.names(predictions) %in% kaechele_teams,]$win_final)) %>% 
+           "Jerry" = sum(predictions[row.names(predictions) %in% jerry_teams,]$win_final, na.rm = TRUE),
+           "Kaechele" = sum(predictions[row.names(predictions) %in% kaechele_teams,]$win_final, na.rm = TRUE)) %>% 
   kable() %>%
   kable_styling("striped", full_width = F) %>%
   column_spec(1, bold=T) %>%
@@ -146,11 +147,11 @@ Here is how each team is expected to contribute to the group stage score:
 ```{r team scores, warning=FALSE, message=FALSE}
 # Jerry top performers
 jerry_team_scores <- cbind(team = rownames(predictions)[rownames(predictions) %in% jerry_teams], 
-                           score = predictions[row.names(predictions) %in% jerry_teams,]$win_final) %>%
+                           score = predictions[row.names(predictions) %in% jerry_teams,]$win_final*100) %>%
                            data.table() 
 # Kaechele top performers
 kaechele_team_scores <- cbind(team = rownames(predictions)[rownames(predictions) %in% kaechele_teams],
-                          score = predictions[row.names(predictions) %in% kaechele_teams,]$win_final) %>%
+                          score = predictions[row.names(predictions) %in% kaechele_teams,]$win_final*100) %>%
                            data.table() 
 
 
